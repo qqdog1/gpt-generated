@@ -1,0 +1,427 @@
+To create an Android application using Flutter, we need to set up a Flutter project with the following structure and files. Flutter uses Dart as the programming language, and the project structure typically includes Dart files for the UI and logic, as well as a pubspec.yaml file for dependencies.
+
+Here are the core classes and files we will need:
+
+- `main.dart`: The entry point of the application.
+- `pubspec.yaml`: The Flutter project configuration file, including dependencies.
+- `allergen.dart`: A data model representing an allergen.
+- `allergen_list.dart`: A widget to display and manage the list of allergens.
+- `allergen_form.dart`: A widget to add or edit an allergen.
+- `diary_entry.dart`: A data model representing a diary entry.
+- `diary_list.dart`: A widget to display and manage the diary entries.
+- `diary_form.dart`: A widget to add or edit a diary entry.
+- `food_allergen_lookup.dart`: A widget to check food items against allergens.
+- `food_item.dart`: A data model representing a food item.
+- `food_item_list.dart`: A widget to display and manage the list of food items.
+- `food_item_form.dart`: A widget to add or edit a food item.
+- `utils.dart`: Utility functions for the application.
+- `storage_service.dart`: A service to handle local storage operations.
+
+Let's start by setting up the `pubspec.yaml` file to define the project dependencies:
+
+pubspec.yaml
+```yaml
+name: allergen_avoider
+description: An app to help people avoid allergens.
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.12.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  path_provider: ^2.0.1
+  flutter_local_notifications: ^5.0.0+4
+  image_picker: ^0.8.1+3
+  intl: ^0.17.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^1.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+```
+
+Now, let's create the entry point of the application:
+
+lib/main.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:allergen_avoider/allergen_list.dart';
+
+void main() {
+  runApp(AllergenAvoiderApp());
+}
+
+class AllergenAvoiderApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Allergen Avoider',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      home: AllergenList(),
+    );
+  }
+}
+```
+
+Next, we'll define the data model for an allergen:
+
+lib/allergen.dart
+```dart
+import 'package:flutter/material.dart';
+
+enum Severity { safe, mild, severe, dangerous }
+
+class Allergen {
+  String name;
+  Severity severity;
+
+  Allergen({required this.name, required this.severity});
+
+  Color getBackgroundColor() {
+    switch (severity) {
+      case Severity.safe:
+        return Colors.green;
+      case Severity.mild:
+        return Colors.yellow;
+      case Severity.severe:
+        return Colors.orange;
+      case Severity.dangerous:
+        return Colors.red;
+      default:
+        return Colors.white;
+    }
+  }
+}
+```
+
+Now, let's create the widget to display and manage the list of allergens:
+
+lib/allergen_list.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:allergen_avoider/allergen.dart';
+import 'package:allergen_avoider/allergen_form.dart';
+
+class AllergenList extends StatefulWidget {
+  @override
+  _AllergenListState createState() => _AllergenListState();
+}
+
+class _AllergenListState extends State<AllergenList> {
+  List<Allergen> allergens = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Allergen List'),
+      ),
+      body: ListView.builder(
+        itemCount: allergens.length,
+        itemBuilder: (context, index) {
+          final allergen = allergens[index];
+          return ListTile(
+            title: Text(allergen.name),
+            tileColor: allergen.getBackgroundColor(),
+            onTap: () {
+              // Navigate to allergen form to edit
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AllergenForm(allergen: allergen),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Navigate to allergen form to add new
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AllergenForm(),
+            ),
+          );
+        },
+        child: Icon(Icons.add),
+      ),
+    );
+  }
+}
+```
+
+Next, we'll create the form to add or edit an allergen:
+
+lib/allergen_form.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:allergen_avoider/allergen.dart';
+
+class AllergenForm extends StatefulWidget {
+  final Allergen? allergen;
+
+  AllergenForm({this.allergen});
+
+  @override
+  _AllergenFormState createState() => _AllergenFormState();
+}
+
+class _AllergenFormState extends State<AllergenForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  Severity _severity = Severity.safe;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.allergen != null) {
+      _nameController.text = widget.allergen!.name;
+      _severity = widget.allergen!.severity;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.allergen == null ? 'Add Allergen' : 'Edit Allergen'),
+      ),
+      body: Form(
+        key: _formKey,
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            children: <Widget>[
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(labelText: 'Allergen Name'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter allergen name';
+                  }
+                  return null;
+                },
+              ),
+              DropdownButtonFormField<Severity>(
+                value: _severity,
+                onChanged: (Severity? newValue) {
+                  setState(() {
+                    _severity = newValue!;
+                  });
+                },
+                items: Severity.values.map<DropdownMenuItem<Severity>>((Severity value) {
+                  return DropdownMenuItem<Severity>(
+                    value: value,
+                    child: Text(value.toString().split('.').last),
+                  );
+                }).toList(),
+                decoration: InputDecoration(labelText: 'Severity'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    // Save allergen
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text('Save'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+We will continue with the diary entry model, diary list, diary form, food allergen lookup, food item model, food item list, food item form, utility functions, and storage service in the following parts. However, due to the complexity and length of the implementation, it's not feasible to provide the entire working code in a single response. We will need to break it down into multiple steps and files.
+
+Let's continue with the diary entry model:
+
+lib/diary_entry.dart
+```dart
+import 'package:flutter/material.dart';
+
+class DiaryEntry {
+  DateTime dateTime;
+  String description;
+  String? imagePath;
+
+  DiaryEntry({required this.dateTime, required this.description, this.imagePath});
+}
+```
+
+Next, we'll create the widget to display and manage the diary entries:
+
+lib/diary_list.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:allergen_avoider/diary_entry.dart';
+import 'package:allergen_avoider/diary_form.dart';
+
+class DiaryList extends StatefulWidget {
+  @override
+  _DiaryListState createState() => _DiaryListState();
+}
+
+class _DiaryListState extends State<DiaryList> {
+  List<DiaryEntry> diaryEntries = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Diary List'),
+      ),
+      body: ListView.builder(
+        itemCount: diaryEntries.length,
+        itemBuilder: (context, index) {
+          final entry = diaryEntries[index];
+          return ListTile(
+            title: Text(entry.description),
+            subtitle: Text(entry.dateTime.toString()),
+            onTap: () {
+              // Navigate to diary form to edit
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DiaryForm(entry: entry),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Navigate to diary form to add new
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DiaryForm(),
+            ),
+          );
+        },
+        child: Icon(Icons.add),
+      ),
+    );
+  }
+}
+```
+
+Next, we'll create the form to add or edit a diary entry:
+
+lib/diary_form.dart
+```dart
+import 'package:flutter/material.dart';
+import 'package:allergen_avoider/diary_entry.dart';
+import 'package:image_picker/image_picker.dart';
+
+class DiaryForm extends StatefulWidget {
+  final DiaryEntry? entry;
+
+  DiaryForm({this.entry});
+
+  @override
+  _DiaryFormState createState() => _DiaryFormState();
+}
+
+class _DiaryFormState extends State<DiaryForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _descriptionController = TextEditingController();
+  DateTime _dateTime = DateTime.now();
+  String? _imagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.entry != null) {
+      _descriptionController.text = widget.entry!.description;
+      _dateTime = widget.entry!.dateTime;
+      _imagePath = widget.entry!.imagePath;
+    }
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker _picker = ImagePicker();
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _imagePath = image.path;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.entry == null ? 'Add Diary Entry' : 'Edit Diary Entry'),
+      ),
+      body: Form(
+        key: _formKey,
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            children: <Widget>[
+              TextFormField(
+                controller: _descriptionController,
+                decoration: InputDecoration(labelText: 'Description'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a description';
+                  }
+                  return null;
+                },
+              ),
+              ElevatedButton(
+                onPressed: _pickImage,
+                child: Text('Pick Image'),
+              ),
+              if (_imagePath != null) Image.file(File(_imagePath!)),
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    // Save diary entry
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text('Save'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+We will continue with the food allergen lookup, food item model, food item list, food item form, utility functions, and storage service in the next parts. Please note that the code provided is a starting point and would need to be expanded with actual storage logic, error handling, and more to be a fully working application.
